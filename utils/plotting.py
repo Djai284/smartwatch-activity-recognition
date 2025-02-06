@@ -159,9 +159,9 @@ def plot_3d_pose(pose, elev=0, azim=0, figsize=(8, 8)):
 def plot_sensor_label(data, data_type,label, title='', filepath=None, size=(15, 6), overlay=True, seconds = 10):
 
 
-    data = data[(data['label'] == label) & (data['frame'] < 100*seconds+min(data[data['label'] == label]['frame']))]
+    data = data[(data['label'] == label) & (data.index < 100*seconds+min(data[data['label'] == label].index))]
 
-    data_t = data.loc[:, 'frame']
+    data_t = data.index
 
     if data_type == 'acc':
         text = 'Accelerometer'
@@ -181,6 +181,7 @@ def plot_sensor_label(data, data_type,label, title='', filepath=None, size=(15, 
     ax.plot(data_t, data.loc[:, f'{data_type}_Z'], 'b-', label='Z')
     ax.set_ylabel(ylabel)
     ax.set_xlabel('Frame')
+    plt.legend()
 
     fig.suptitle(title, size=16)
     if filepath is not None:

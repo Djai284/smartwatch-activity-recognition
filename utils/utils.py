@@ -4,18 +4,88 @@ import time
 import csv
 from tqdm import tqdm
 import pandas as pd
+import os
+import json
+import re
 
+def load_mmfit():
+
+       raw_data = pd.DataFrame(columns = ['index', 'frame', 'timestamp', 'acc_X', 'acc_Y', 'acc_Z', 'gyr_X',
+              'gyr_Y', 'gyr_Z', 'label', 'user_id'])
+
+       for i in tqdm(range(21)):
+
+              acc_data = load_modality(f'mm-fit/w{i:02}/w{i:02}_sw_l_acc.npy')
+              gyr_data = load_modality(f'mm-fit/w{i:02}/w{i:02}_sw_l_gyr.npy')
+              label_data = pd.read_csv(f'mm-fit/w{i:02}/w{i:02}_labels.csv', names = ['start_frame', 'end_frame', 'repititions', 'label'])
+
+              df = create_df(acc_data, gyr_data, label_data, i)
+              raw_data = pd.concat([raw_data, df], axis =0)
+
+       return raw_data
+
+def find_key_by_value(dictionary, filename):
+    # Extract numeric part from the filename
+    match = re.search(r'(\d+)', filename)
+    if not match:
+        return None  
+    
+    num = int(match.group(1))  # Convert extracted number to integer
+
+    # Search for the key containing this number in its list of values
+    for key, values in dictionary.items():
+        if num in values:
+            return key
+
+    return None 
+
+def load_crossfit(datapath = None, info_path=None):
+
+    if not datapath:
+        datapath = "/Users/jacobgottesman/Public/DS 4440/smartwatch-activity-recognition/crossfit_dat/constrained_workout/preprocessed_numpy_data/np_exercise_data"
+
+    if not info_path:
+        info_path = 'participant_ex_code_map.txt'
+
+    with open(info_path, 'rb') as f:
+        part_info = json.load(f)
+
+    df = pd.DataFrame(columns = ['acc_X', 'acc_Y', 'acc_Z', 'gyr_X', 'gyr_Y', 'gyr_Z', 'user_id', 'label'])
+
+    for root, dirs, files in os.walk(datapath):
+
+        # loading different exercise data
+        for dir in tqdm(dirs):
+
+            # loop through the files
+            for root, dirs1, files1 in os.walk(datapath+'/'+dir):
+
+                # loop through all the files
+                for file in files1:
+
+
+                    data = np.load(f'{datapath}/{dir}/{file}')
+                    temp_df = pd.DataFrame(data[:6, :].T, columns = ['acc_X', 'acc_Y', 'acc_Z', 'gyr_X', 'gyr_Y', 'gyr_Z'])
+                    temp_df['label'] = dir.lower().replace(' ', '')
+                    temp_df['user_id'] = find_key_by_value(part_info, file)
+
+                    df = pd.concat([df, temp_df], axis = 0)
+
+    return df
 
 
 def create_examples(df, seconds=10):
-    ex_df = pd.DataFrame(columns=['id', 'sig_array', 'label'])
+    ex_df = pd.DataFrame(columns=['id', 'sig_array', 'label', 'user_id'])
     label = df.loc[0, 'label']
+    user = df.loc[0, 'user_id']
     counter = 0
     arr = []
 
-    for i, row in df.iterrows():
-        if row['label'] != label:
+    print("creating dataset for model")
+    for i, row in tqdm(df.iterrows(), total= len(df)):
+        if row['label'] != label or row['user_id'] !=  user:
             label = row['label']
+            user = row['user_id']
             counter = 0
             arr = []
 
@@ -23,7 +93,7 @@ def create_examples(df, seconds=10):
         counter += 1  # Increment counter
 
         if counter >= seconds * 100:
-            ex_df.loc[len(ex_df)] = [len(ex_df), np.array(arr), label]
+            ex_df.loc[len(ex_df)] = [len(ex_df), np.array(arr), label, user]
             counter = 0
             arr = []
 
