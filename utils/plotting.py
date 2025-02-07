@@ -1,7 +1,13 @@
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
 import matplotlib
+import scipy.io
+import warnings
+from typing import Dict, Tuple, Any, Optional, List
+import logging
+from scipy import signal
 
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -159,9 +165,9 @@ def plot_3d_pose(pose, elev=0, azim=0, figsize=(8, 8)):
 def plot_sensor_label(data, data_type,label, title='', filepath=None, size=(15, 6), overlay=True, seconds = 10):
 
 
-    data = data[(data['label'] == label) & (data.index < 100*seconds+min(data[data['label'] == label].index))]
+    data = data[(data.index > min(data[data['label'] == label].index)) & (data.index < 100*seconds+min(data[data['label'] == label].index))]
 
-    data_t = data.index
+    data_t = range(len(data.index))
 
     if data_type == 'acc':
         text = 'Accelerometer'
@@ -180,10 +186,85 @@ def plot_sensor_label(data, data_type,label, title='', filepath=None, size=(15, 
     ax.plot(data_t, data.loc[:, f'{data_type}_Y'], 'g-', label='Y')
     ax.plot(data_t, data.loc[:, f'{data_type}_Z'], 'b-', label='Z')
     ax.set_ylabel(ylabel)
-    ax.set_xlabel('Frame')
+    ax.set_xlabel('reading')
     plt.legend()
 
     fig.suptitle(title, size=16)
     if filepath is not None:
         fig.savefig(filepath, bbox_inches='tight')
+    plt.show()
+
+def plot_imu_data(df: pd.DataFrame,
+                activity: str,
+                sensor_type: str = 'both',
+                time_window: Optional[float] = None,
+                instance_index: int = 0,
+                figsize: tuple = (15, 8)) -> None:
+    # """
+    # Plot IMU data for a specific activity.
+    
+    # Args:
+    #     df: DataFrame containing IMU data
+    #     activity: Name of the activity to plot
+    #     sensor_type: 'acc' for accelerometer, 'gyr' for gyroscope, or 'both' for both
+    #     time_window: Number of seconds to plot (None for entire activity)
+    #     instance_index: Which instance of the activity to plot (if multiple exist)
+    #     figsize: Figure size for the plot
+    # """
+    # Filter data for the specified activity
+    activity_data = df[df['label'] == activity].copy()
+    
+    if activity_data.empty:
+        print(f"No data found for activity: {activity}")
+        return
+    
+    # Get unique instances based on continuous timestamps
+    activity_data['time_diff'] = activity_data['timestamp'].diff()
+    instance_breaks = activity_data[activity_data['time_diff'] > 1].index
+    instance_indices = np.split(activity_data.index, instance_breaks)
+    
+    if instance_index >= len(instance_indices):
+        print(f"Instance index {instance_index} is out of range. Maximum available: {len(instance_indices)-1}")
+        return
+    
+    # Get data for the specified instance
+    instance_data = activity_data.loc[instance_indices[instance_index]]
+    
+    # Adjust timestamps to start from 0
+    instance_data['relative_time'] = instance_data['timestamp'] - instance_data['timestamp'].iloc[0]
+    
+    # Apply time window if specified
+    if time_window is not None:
+        instance_data = instance_data[instance_data['relative_time'] <= time_window]
+    
+    # Create the plot
+    if sensor_type == 'both':
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
+    else:
+        fig, ax1 = plt.subplots(figsize=figsize)
+    
+    # Plot accelerometer data
+    if sensor_type in ['acc', 'both']:
+        ax1.plot(instance_data['relative_time'], instance_data['acc_X'], label='X', color='r')
+        ax1.plot(instance_data['relative_time'], instance_data['acc_Y'], label='Y', color='g')
+        ax1.plot(instance_data['relative_time'], instance_data['acc_Z'], label='Z', color='b')
+        ax1.set_title(f'Accelerometer Data - {activity}')
+        ax1.set_xlabel('Time (seconds)')
+        ax1.set_ylabel('Acceleration')
+        ax1.grid(True)
+        ax1.legend()
+    
+    # Plot gyroscope data
+    if sensor_type in ['gyr', 'both']:
+        ax = ax2 if sensor_type == 'both' else ax1
+        ax.plot(instance_data['relative_time'], instance_data['gyr_X'], label='X', color='r')
+        ax.plot(instance_data['relative_time'], instance_data['gyr_Y'], label='Y', color='g')
+        ax.plot(instance_data['relative_time'], instance_data['gyr_Z'], label='Z', color='b')
+        ax.set_title(f'Gyroscope Data - {activity}')
+        ax.set_xlabel('Time (seconds)')
+        ax.set_ylabel('Angular Velocity')
+        ax.grid(True)
+        ax.legend()
+    
+    plt.tight_layout()
     plt.show()

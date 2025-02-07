@@ -7,6 +7,302 @@ import pandas as pd
 import os
 import json
 import re
+import numpy as np
+import pandas as pd
+import scipy.io
+import warnings
+from typing import Dict, Tuple, Any, Optional, List
+import logging
+from scipy import signal
+
+# Set up logging with more detail
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+class IMUDataProcessor:
+    """
+    Handles processing of IMU data specific to right-arm worn sensors.
+    Combines functionality from both original files into a single, coherent class.
+    """
+    
+    EXPECTED_SAMPLE_RATE = 50  # Hz
+    DEFAULT_EXCLUDED_ACTIVITIES = [
+        'Device on Table',
+        'Non-Exercise',
+        'Tap Left Device',
+        'Tap Right Device',
+        'Arm Band Adjustment',
+        'Initial Activity',
+        'Invalid',
+        'Note',
+        'Unlisted Exercise'
+    ]
+    
+    @staticmethod
+    def safe_extract_value(array_like, dtype=None):
+        """
+        Safely extract a scalar value from a numpy array.
+        """
+        try:
+            if hasattr(array_like, 'item'):
+                value = array_like.item()
+            else:
+                value = array_like
+                
+            if dtype is not None:
+                value = dtype(value)
+            return value
+        except Exception as e:
+            logger.error(f"Error extracting value: {str(e)}")
+            return None
+
+    @staticmethod
+    def process_imu_data(instance: np.ndarray) -> Dict[str, np.ndarray]:
+        """
+        Process IMU data from the structured array format.
+        """
+        try:
+            # Extract the IMU data fields directly from instance
+            imu_struct = instance['data'][0,0][0]
+            
+            return {
+                'accelerometer': imu_struct['accelDataMatrix'][0],
+                'gyroscope': imu_struct['gyroDataMatrix'][0],
+                'slave_accelerometer': imu_struct['slaveAccelDataMatrix'][0],
+                'slave_gyroscope': imu_struct['slaveGyroDataMatrix'][0]
+            }
+        except Exception as e:
+            logger.error(f"Error processing IMU data: {str(e)}")
+            return None
+
+class MatlabDataProcessor:
+    """
+    A unified class to handle loading, processing, and analyzing MATLAB exercise data.
+    """
+    
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+        self.mat_contents = None
+        self.imu_processor = IMUDataProcessor()
+        self.activities = None
+        self.processed_df = None
+    
+    def load_file(self) -> None:
+        """
+        Load the MATLAB file using scipy.io
+        """
+        try:
+            self.mat_contents = scipy.io.loadmat(self.file_path)
+            logger.info("File loaded successfully")
+            
+            # Load activities list if available
+            if 'exerciseConstants' in self.mat_contents:
+                self.activities = [act[0] for act in self.mat_contents['exerciseConstants'][0,0]['activities'][0]]
+                logger.info(f"Loaded {len(self.activities)} activities")
+            else:
+                logger.warning("No exercise constants found in file")
+            
+        except Exception as e:
+            logger.error(f"Error loading file: {str(e)}")
+            raise
+
+    def process_instance(self, instance: np.ndarray, row: int, col: int) -> Optional[Dict[str, Any]]:
+        """
+        Process a single exercise instance from the subject_data array.
+        """
+        try:
+            # Skip empty instances
+            if instance.size == 0:
+                return None
+            
+            logger.debug(f"Processing instance at [{row},{col}]")
+            
+            # Basic instance information
+            instance_data = {
+                'matrix_row': row,
+                'matrix_col': col
+            }
+            
+            # Try to extract subject ID - field name might vary
+            for field in ['subjectID', 'subjectIndex']:
+                if field in instance.dtype.names:
+                    subject_id = self.imu_processor.safe_extract_value(instance[field][0,0], dtype=int)
+                    if subject_id is not None:
+                        instance_data['subject_id'] = subject_id
+                        break
+            
+            # Extract activity name
+            if 'activityName' in instance.dtype.names:
+                activity_name = self.imu_processor.safe_extract_value(instance['activityName'][0,0], dtype=str)
+                if activity_name:
+                    instance_data['activity_name'] = activity_name
+            
+            # Optional fields
+            if 'activityReps' in instance.dtype.names and instance['activityReps'][0,0].size > 0:
+                instance_data['activity_reps'] = self.imu_processor.safe_extract_value(instance['activityReps'][0,0], dtype=int)
+            
+            if 'activityVideoStartTimeSeconds' in instance.dtype.names and instance['activityVideoStartTimeSeconds'][0,0].size > 0:
+                instance_data['start_time'] = self.imu_processor.safe_extract_value(instance['activityVideoStartTimeSeconds'][0,0], dtype=float)
+            
+            # Process IMU data
+            imu_data = self.imu_processor.process_imu_data(instance)
+            if imu_data:
+                instance_data['imu_data'] = imu_data
+                logger.debug(f"Successfully processed IMU data for instance [{row},{col}]")
+            else:
+                logger.warning(f"No IMU data processed for instance [{row},{col}]")
+                return None
+            
+            return instance_data
+            
+        except Exception as e:
+            logger.error(f"Error processing instance [{row},{col}]: {str(e)}")
+            return None
+
+    def convert_to_timeseries(self, instance_data: Dict[str, Any]) -> Optional[pd.DataFrame]:
+        """
+        Convert a processed instance into a time-series DataFrame.
+        """
+        try:
+            imu_data = instance_data['imu_data']
+            accel_data = imu_data['accelerometer']
+            gyro_data = imu_data['gyroscope']
+            
+            n_samples = accel_data.shape[0]
+            
+            df_data = {
+                'timestamp': accel_data[:, 0].astype(float),
+                'acc_X': accel_data[:, 1].astype(float),
+                'acc_Y': accel_data[:, 2].astype(float),
+                'acc_Z': accel_data[:, 3].astype(float),
+                'gyr_X': gyro_data[:, 1].astype(float),
+                'gyr_Y': gyro_data[:, 2].astype(float),
+                'gyr_Z': gyro_data[:, 3].astype(float),
+                'matrix_row': [instance_data['matrix_row']] * n_samples,
+                'matrix_col': [instance_data['matrix_col']] * n_samples
+            }
+            
+            # Add required metadata if available
+            for field in ['activity_name', 'subject_id']:
+                if field in instance_data:
+                    df_data[field] = [instance_data[field]] * n_samples
+            
+            # Add optional metadata
+            for field in ['activity_reps', 'start_time']:
+                if field in instance_data:
+                    df_data[field] = [instance_data[field]] * n_samples
+            
+            return pd.DataFrame(df_data)
+            
+        except Exception as e:
+            logger.error(f"Error converting to timeseries: {str(e)}")
+            return None
+
+    def process_all_data(self, convert_to_df: bool = True) -> Any:
+        """
+        Process all valid exercise instances in the subject_data array.
+        """
+        try:
+            if 'subject_data' not in self.mat_contents:
+                raise ValueError("No subject_data found in MATLAB file")
+                
+            subject_data = self.mat_contents['subject_data']
+            logger.info(f"Processing data matrix of shape {subject_data.shape}")
+            
+            processed_instances = []
+            all_dfs = []
+            
+            total_instances = 0
+            valid_instances = 0
+            
+            for i in range(subject_data.shape[0]):
+                for j in range(subject_data.shape[1]):
+                    cell_data = subject_data[i, j]
+                    total_instances += 1
+                    
+                    if cell_data.size > 0:
+                        instance = self.process_instance(cell_data, i, j)
+                        if instance:
+                            valid_instances += 1
+                            
+                            if convert_to_df:
+                                df = self.convert_to_timeseries(instance)
+                                if df is not None:
+                                    all_dfs.append(df)
+                            else:
+                                processed_instances.append(instance)
+            
+            logger.info(f"Processed {valid_instances} valid instances out of {total_instances} total cells")
+            
+            if convert_to_df:
+                if not all_dfs:
+                    logger.error("No valid DataFrames were created during processing")
+                    raise ValueError("No valid data was processed")
+                    
+                final_df = pd.concat(all_dfs, ignore_index=True)
+                final_df = final_df.sort_values(['subject_id', 'timestamp']).reset_index(drop=True)
+                self.processed_df = final_df
+                logger.info(f"Created final DataFrame with {len(final_df)} rows")
+                return final_df
+            else:
+                return processed_instances
+                
+        except Exception as e:
+            logger.error(f"Error processing data: {str(e)}")
+            raise
+
+    def get_dataset_summary(self) -> Dict[str, Any]:
+        """
+        Generate comprehensive summary statistics for the processed dataset.
+        """
+        if self.processed_df is None:
+            raise ValueError("No processed data available. Run process_all_data first.")
+            
+        df = self.processed_df
+        summary = {
+            'total_samples': len(df),
+            'total_subjects': df['subject_id'].nunique(),
+            'total_activities': df['activity_name'].nunique(),
+            'samples_per_subject': df.groupby('subject_id').size().agg(['min', 'max', 'mean', 'median']).to_dict(),
+            'activities_per_subject': df.groupby('subject_id')['activity_name'].nunique().agg(['min', 'max', 'mean', 'median']).to_dict(),
+            'top_activities': df.groupby('activity_name').size().sort_values(ascending=False).head(10).to_dict()
+        }
+        
+        if 'activity_reps' in df.columns:
+            summary['reps_by_activity'] = df.groupby('activity_name')['activity_reps'].first().to_dict()
+        
+        return summary
+
+    def filter_activities(self, exclude_activities: List[str] = None) -> pd.DataFrame:
+        """
+        Filter out specified activities from the processed DataFrame.
+        """
+        if self.processed_df is None:
+            raise ValueError("No processed data available. Run process_all_data first.")
+            
+        if exclude_activities is None:
+            exclude_activities = self.imu_processor.DEFAULT_EXCLUDED_ACTIVITIES
+        
+        filtered_df = self.processed_df[~self.processed_df['activity_name'].isin(exclude_activities)].reset_index(drop=True)
+        return filtered_df
+
+def process_matlab_data(file_path: str, convert_to_df: bool = True) -> Tuple[Any, List[str]]:
+    """
+    Convenience function to load and process the MATLAB file.
+    """
+    processor = MatlabDataProcessor(file_path)
+    
+    try:
+        processor.load_file()
+        processed_data = processor.process_all_data(convert_to_df=convert_to_df)
+        return processed_data, processor.activities
+    
+    except Exception as e:
+        logger.error(f"Error in data loading and processing: {str(e)}")
+        raise
 
 def load_mmfit():
 
@@ -42,7 +338,7 @@ def find_key_by_value(dictionary, filename):
 def load_crossfit(datapath = None, info_path=None):
 
     if not datapath:
-        datapath = "/Users/jacobgottesman/Public/DS 4440/smartwatch-activity-recognition/crossfit_dat/constrained_workout/preprocessed_numpy_data/np_exercise_data"
+        datapath = "/Users/jacobgottesman/Public/DS 4440/smartwatch-activity-recognition/crossfit_data/constrained_workout/preprocessed_numpy_data/np_exercise_data"
 
     if not info_path:
         info_path = 'participant_ex_code_map.txt'
