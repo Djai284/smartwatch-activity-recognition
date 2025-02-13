@@ -550,3 +550,75 @@ class IMUVisualizer:
         
         return pd.DataFrame(activities).set_index('activity')
 
+
+# Mapping of RECOFIT exercises to MM Fit names
+exercise_mapping = {
+    # ✅ Direct Matches
+    'Pushups': 'Pushups',
+    'Jumping Jacks': 'Jumping Jacks',
+    'Sit-ups': 'Situps',
+    'Bicep Curl': 'Bicep Curls',
+    'Lateral Raise': 'Lateral Shoulder Raises',
+
+    # 🔸 Partial Matches (Closest Equivalent)
+    'Squat': 'Squats',
+    'Squat Jump': 'Squats',
+    'Wall Squat': 'Squats',
+    'Dumbbell Squat (hands at side)': 'Squats',
+    'Squat (arms in front of body, parallel to ground)': 'Squats',
+    'Squat (hands behind head)': 'Squats',
+    'Squat (kettlebell / goblet)': 'Squats',
+
+    'Pushup (knee or foot variation)': 'Pushups',
+
+    'Shoulder Press (dumbbell)': 'Dumbbell Shoulder Press',
+    'Squat Rack Shoulder Press': 'Dumbbell Shoulder Press',
+
+    'Lunge (alternating both legs, weight optional)': 'Lunges',
+    'Walking lunge': 'Lunges',
+
+    'Dumbbell Row (knee on bench) (label spans both arms)': 'Dumbbell Rows',
+    'Dumbbell Row (knee on bench) (left arm)': 'Dumbbell Rows',
+    'Dumbbell Row (knee on bench) (right arm)': 'Dumbbell Rows',
+    'Dumbbell Deadlift Row': 'Dumbbell Rows',
+
+    'Overhead Triceps Extension': 'Tricep Extensions',
+    'Triceps extension (lying down)': 'Tricep Extensions',
+    'Triceps Kickback (knee on bench) (label spans both arms)': 'Tricep Extensions',
+    'Triceps Kickback (knee on bench) (left arm)': 'Tricep Extensions',
+    'Triceps Kickback (knee on bench) (right arm)': 'Tricep Extensions',
+    'Triceps extension (lying down) (left arm)': 'Tricep Extensions',
+    'Triceps extension (lying down) (right arm)': 'Tricep Extensions',
+
+    # ❌ No Direct Match (Keeping As-Is for Now)
+    'Non-Exercise': 'Non Exercise',
+    'Device on Table': 'Device on Table',
+    'Tap Left Device': 'Tap Left Device',
+    'Tap Right Device': 'Tap Right Device',
+    'Arm Band Adjustment': 'Arm Band Adjustment',
+    'Initial Activity': 'Initial Activity',
+    'Invalid': 'Invalid',
+    'Note': 'Note',
+    'Unlisted Exercise': 'Unlisted Exercise'
+}
+
+def rename_exercises(df, column_name='activity_name'):
+    """
+    Returns a new DataFrame with exercise names mapped to MM Fit format
+    in camel case with spaces. The original DataFrame remains unchanged.
+    """
+    def format_camel_case(text):
+        """ Convert text to camel case with spaces """
+        return ' '.join(word.capitalize() for word in text.split())
+
+    def map_exercise(name):
+        """ Map exercise names based on predefined dictionary """
+        return exercise_mapping.get(name, format_camel_case(name))
+
+    # Create a copy of the DataFrame to avoid modifying the original
+    df_copy = df.copy()
+
+    # Apply renaming function
+    df_copy[column_name] = df_copy[column_name].apply(map_exercise)
+    
+    return df_copy  # Return the modified copy

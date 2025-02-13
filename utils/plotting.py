@@ -165,7 +165,7 @@ def plot_3d_pose(pose, elev=0, azim=0, figsize=(8, 8)):
 def plot_sensor_label(data, data_type,label, title='', filepath=None, size=(15, 6), overlay=True, seconds = 10):
 
 
-    data = data[(data.index > min(data[data['label'] == label].index)) & (data.index < 100*seconds+min(data[data['label'] == label].index))]
+    data = data[(data.index > min(data[data['activity_name'] == label].index)) & (data.index < 100*seconds+min(data[data['activity_name'] == label].index))]
 
     data_t = range(len(data.index))
 
@@ -212,7 +212,7 @@ def plot_imu_data(df: pd.DataFrame,
     #     figsize: Figure size for the plot
     # """
     # Filter data for the specified activity
-    activity_data = df[df['label'] == activity].copy()
+    activity_data = df[df['activity_name'] == activity].copy()
     
     if activity_data.empty:
         print(f"No data found for activity: {activity}")
