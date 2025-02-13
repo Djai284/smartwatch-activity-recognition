@@ -1,13 +1,4 @@
 import numpy as np
-import argparse
-import time
-import csv
-from tqdm import tqdm
-import pandas as pd
-import os
-import json
-import re
-import numpy as np
 import pandas as pd
 import scipy.io
 import warnings
@@ -304,261 +295,258 @@ def process_matlab_data(file_path: str, convert_to_df: bool = True) -> Tuple[Any
         logger.error(f"Error in data loading and processing: {str(e)}")
         raise
 
-def load_mmfit():
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from typing import Optional, Union, List, Dict, Tuple
+import logging
 
-       raw_data = pd.DataFrame(columns = ['index', 'frame', 'timestamp', 'acc_X', 'acc_Y', 'acc_Z', 'gyr_X',
-              'gyr_Y', 'gyr_Z', 'label', 'user_id'])
+logger = logging.getLogger(__name__)
 
-       for i in tqdm(range(21)):
-
-              acc_data = load_modality(f'mm-fit/w{i:02}/w{i:02}_sw_l_acc.npy')
-              gyr_data = load_modality(f'mm-fit/w{i:02}/w{i:02}_sw_l_gyr.npy')
-              label_data = pd.read_csv(f'mm-fit/w{i:02}/w{i:02}_labels.csv', names = ['start_frame', 'end_frame', 'repititions', 'label'])
-
-              df = create_df(acc_data, gyr_data, label_data, i)
-              raw_data = pd.concat([raw_data, df], axis =0)
-
-       return raw_data
-
-def find_key_by_value(dictionary, filename):
-    # Extract numeric part from the filename
-    match = re.search(r'(\d+)', filename)
-    if not match:
-        return None  
-    
-    num = int(match.group(1))  # Convert extracted number to integer
-
-    # Search for the key containing this number in its list of values
-    for key, values in dictionary.items():
-        if num in values:
-            return key
-
-    return None 
-
-def load_crossfit(datapath = None, info_path=None):
-
-    if not datapath:
-        datapath = "/Users/jacobgottesman/Public/DS 4440/smartwatch-activity-recognition/crossfit_data/constrained_workout/preprocessed_numpy_data/np_exercise_data"
-
-    if not info_path:
-        info_path = 'participant_ex_code_map.txt'
-
-    with open(info_path, 'rb') as f:
-        part_info = json.load(f)
-
-    df = pd.DataFrame(columns = ['acc_X', 'acc_Y', 'acc_Z', 'gyr_X', 'gyr_Y', 'gyr_Z', 'user_id', 'label'])
-
-    for root, dirs, files in os.walk(datapath):
-
-        # loading different exercise data
-        for dir in tqdm(dirs):
-
-            # loop through the files
-            for root, dirs1, files1 in os.walk(datapath+'/'+dir):
-
-                # loop through all the files
-                for file in files1:
-
-
-                    data = np.load(f'{datapath}/{dir}/{file}')
-                    temp_df = pd.DataFrame(data[:6, :].T, columns = ['acc_X', 'acc_Y', 'acc_Z', 'gyr_X', 'gyr_Y', 'gyr_Z'])
-                    temp_df['label'] = dir.lower().replace(' ', '')
-                    temp_df['user_id'] = find_key_by_value(part_info, file)
-
-                    df = pd.concat([df, temp_df], axis = 0)
-
-    return df
-
-
-def create_examples(df, dim=500, between = None):
+class IMUVisualizer:
     """
-    This creates the data in proper form for a CNN model
-    Args:
-        df: The data in format one reading per row 
-        dim: dimension of the cnn (number of reading in each input)
-        between: time between starts of different sequence (if none they will be completely seperate)
+    Handles visualization of IMU sensor data with enhanced features.
     """
-    ex_df = pd.DataFrame(columns=['id', 'sig_array', 'label', 'user_id'])
-    label = df.loc[0, 'label']
-    user = df.loc[0, 'user_id']
-    counter = 0
-    i= 0
-    j = i + between
-    arr = []
-
-    print("creating dataset for model")
-    while i < len(df):
-
-        row = df.iloc[i,:]
-        if row['label'] != label or row['user_id'] !=  user:
-            label = row['label']
-            user = row['user_id']
-            counter = 0
-            arr = []
-            i = j
-            j = i + between
-
-        arr.append(row[['gyr_X', 'gyr_Y', 'gyr_Z', 'acc_X', 'acc_Y', 'acc_Z']].values)
-        counter += 1  
-
-        if counter >= dim:
-            ex_df.loc[len(ex_df)] = [len(ex_df), np.array(arr), label, user]
-            counter = 0
-            arr = []
-            i = j
-            j = i + between
-
-        i += 1
-
-    return ex_df
-
-
-def create_df(acc_data, gyr_data, label_df, person_id = 0):
-
-    # create dataframes for acceleromters and gyrosccopes
-    acc_df = pd.DataFrame(acc_data, columns=['frame', 'timestamp', 'acc_X', 'acc_Y', 'acc_Z']).reset_index()
-    gyr_df = pd.DataFrame(gyr_data, columns=['frame', 'timestamp', 'gyr_X', 'gyr_Y', 'gyr_Z']).reset_index()
-
-    # combine the two dataframes
-    df = pd.merge(acc_df, gyr_df, how = 'inner', on = ['index', 'frame', 'timestamp'])
-    df['label'] = " "
-    df['user_id'] = person_id
-
-    # start at the begnining of the labels
-    label_tracker = 0
-    label = label_df.loc[label_tracker, 'label']
     
-    # loop througbn the dataframe
-    for i, row in df.iterrows():
+    def __init__(self, df: pd.DataFrame):
+        """
+        Initialize the visualizer with a DataFrame.
         
-        # move to next label if frame is past current exercise
-        if row['frame'] > label_df.loc[label_tracker, 'end_frame']:
-            label_tracker += 1
-
-            # move to next exercise
-            if label_tracker < len(label_df):
-                label = label_df.loc[label_tracker, 'label']
-
-            # break from loop if no more exercises
-            else:
-                df.loc[i:, 'label'] = 'non-e'
-                break
+        Args:
+            df: DataFrame containing IMU data with required columns
+        """
+        self.df = df.copy()  # Create a copy to avoid modifying original data
+        self._validate_dataframe()
+        self.default_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
         
-        # assign proper label
-        if row['frame'] > label_df.loc[label_tracker, 'start_frame']:
-            df.at[i, 'label'] = label
+    def _validate_dataframe(self) -> None:
+        """Validate that the DataFrame has all required columns."""
+        required_columns = [
+            'timestamp', 'label',
+            'acc_X', 'acc_Y', 'acc_Z',
+            'gyr_X', 'gyr_Y', 'gyr_Z'
+        ]
+        
+        missing_cols = [col for col in required_columns if col not in self.df.columns]
+        if missing_cols:
+            raise ValueError(f"DataFrame missing required columns: {missing_cols}")
+
+    def get_activity_segments(self, activity: str) -> List[pd.DataFrame]:
+        """
+        Split activity data into separate continuous segments.
+        
+        Args:
+            activity: Name of the activity to segment
+            
+        Returns:
+            List of DataFrames, each containing a continuous segment
+        """
+        activity_data = self.df[self.df['label'] == activity].copy()
+        
+        if activity_data.empty:
+            logger.warning(f"No data found for activity: {activity}")
+            return []
+        
+        # Sort by timestamp to ensure proper segmentation
+        activity_data = activity_data.sort_values('timestamp')
+        
+        # Identify breaks between segments (gaps > 0.1 seconds)
+        activity_data['time_diff'] = activity_data['timestamp'].diff()
+        segment_breaks = activity_data[activity_data['time_diff'] > 0.1].index
+        
+        # Split into segments
+        segments = []
+        if len(segment_breaks) == 0:
+            segments = [activity_data]
         else:
-            df.at[i, 'label'] = "non-e"
+            indices = np.split(activity_data.index, segment_breaks)
+            segments = [activity_data.loc[idx].copy() for idx in indices if len(idx) > 0]
+        
+        # Add relative timestamps to each segment
+        for segment in segments:
+            if not segment.empty:
+                segment['relative_time'] = segment['timestamp'] - segment['timestamp'].iloc[0]
+            
+        return [seg for seg in segments if len(seg) > 0]
 
-    return df
+    def plot_imu_data(self,
+                     activity: str,
+                     sensor_type: str = 'both',
+                     time_window: Optional[float] = None,
+                     instance_index: int = 0,
+                     figsize: tuple = (15, 8),
+                     show_statistics: bool = True) -> Optional[Tuple[plt.Figure, Union[plt.Axes, Tuple[plt.Axes, plt.Axes]]]]:
+        """
+        Plot IMU data for a specific activity with enhanced features.
+        
+        Args:
+            activity: Name of the activity to plot
+            sensor_type: 'acc' for accelerometer, 'gyr' for gyroscope, or 'both' for both
+            time_window: Number of seconds to plot (None for entire activity)
+            instance_index: Which instance of the activity to plot
+            figsize: Figure size for the plot
+            show_statistics: Whether to show summary statistics in the plot
+            
+        Returns:
+            Tuple of (figure, axes) if successful, None otherwise
+        """
+        segments = self.get_activity_segments(activity)
+        
+        if not segments:
+            logger.warning(f"No segments found for activity: {activity}")
+            return None
+            
+        if instance_index >= len(segments):
+            logger.warning(f"Instance index {instance_index} out of range. Maximum available: {len(segments)-1}")
+            return None
+        
+        # Get data for the specified instance
+        instance_data = segments[instance_index]
+        
+        # Ensure data is sorted by time
+        instance_data = instance_data.sort_values('relative_time')
+        
+        # Apply time window if specified
+        if time_window is not None:
+            instance_data = instance_data[instance_data['relative_time'] <= time_window].copy()
+        
+        # Create the plot
+        if sensor_type == 'both':
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
+            axes = (ax1, ax2)
+        else:
+            fig, ax1 = plt.subplots(figsize=figsize)
+            axes = ax1
+        
+        # Plot accelerometer data
+        if sensor_type in ['acc', 'both']:
+            self._plot_sensor_data(ax1, instance_data, 'acc', show_statistics)
+        
+        # Plot gyroscope data
+        if sensor_type in ['gyr', 'both']:
+            ax = ax2 if sensor_type == 'both' else ax1
+            self._plot_sensor_data(ax, instance_data, 'gyr', show_statistics)
+        
+        plt.tight_layout()
+        return fig, axes
 
+    def _plot_sensor_data(self, ax: plt.Axes, data: pd.DataFrame, 
+                         sensor_type: str, show_statistics: bool) -> None:
+        """Helper method to plot sensor data with statistics."""
+        sensor_map = {
+            'acc': ('Accelerometer', 'Acceleration (m/s²)', ['acc_X', 'acc_Y', 'acc_Z']),
+            'gyr': ('Gyroscope', 'Angular Velocity (rad/s)', ['gyr_X', 'gyr_Y', 'gyr_Z'])
+        }
+        
+        title, ylabel, columns = sensor_map[sensor_type]
+        activity = data['label'].iloc[0]
+        
+        # Plot the data
+        for col, color in zip(columns, self.default_colors):
+            ax.plot(data['relative_time'], data[col], 
+                   label=col.split('_')[1], color=color)
+        
+        # Add statistics if requested
+        if show_statistics:
+            stats_text = self._generate_statistics(data[columns])
+            ax.text(0.02, 0.98, stats_text,
+                   transform=ax.transAxes,
+                   verticalalignment='top',
+                   fontsize=8,
+                   bbox=dict(facecolor='white', alpha=0.8))
+        
+        ax.set_title(f'{title} Data - {activity}')
+        ax.set_xlabel('Time (seconds)')
+        ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        
+        # Ensure axis limits are appropriate
+        ax.set_xlim(data['relative_time'].min(), data['relative_time'].max())
+        y_range = max(abs(data[columns].min().min()), abs(data[columns].max().max()))
+        ax.set_ylim(-y_range * 1.1, y_range * 1.1)
 
+    def _generate_statistics(self, data: pd.DataFrame) -> str:
+        """Generate summary statistics text."""
+        stats = []
+        for col in data.columns:
+            axis = col.split('_')[1]
+            stats.extend([
+                f"{axis}-axis statistics:",
+                f"  Mean: {data[col].mean():.2f}",
+                f"  Std: {data[col].std():.2f}",
+                f"  Max: {data[col].max():.2f}",
+                f"  Min: {data[col].min():.2f}"
+            ])
+        return '\n'.join(stats)
 
-def load_modality(filepath):
-    """
-    Loads modality from filepath and returns numpy array, or None if no file is found.
-    :param filepath: File path to MM-Fit modality.
-    :return: MM-Fit modality (numpy array).
-    """
-    try:
-        mod = np.load(filepath)
-    except FileNotFoundError as e:
-        mod = None
-        print('{}. Returning None'.format(e))
-    return mod
+    def get_activity_summary(self, activity: str = None) -> pd.DataFrame:
+        """
+        Get summary statistics for one or all activities.
+        
+        Args:
+            activity: Specific activity to summarize, or None for all activities
+            
+        Returns:
+            DataFrame containing activity statistics
+        """
+        if activity:
+            data = self.df[self.df['label'] == activity]
+        else:
+            data = self.df
+            
+        summaries = []
+        for name, group in data.groupby('label'):
+            segments = self.get_activity_segments(name)
+            
+            # Skip if no valid segments
+            if not segments:
+                continue
+                
+            summary = {
+                'label': name,
+                'total_instances': len(segments),
+                'total_samples': len(group),
+                'avg_duration': np.mean([seg['relative_time'].max() for seg in segments]),
+                'min_duration': np.min([seg['relative_time'].max() for seg in segments]),
+                'max_duration': np.max([seg['relative_time'].max() for seg in segments])
+            }
+            
+            # Add sensor statistics
+            for sensor in ['acc', 'gyr']:
+                for axis in ['X', 'Y', 'Z']:
+                    col = f'{sensor}_{axis}'
+                    summary.update({
+                        f'{col}_mean': group[col].mean(),
+                        f'{col}_std': group[col].std(),
+                        f'{col}_max': group[col].max(),
+                        f'{col}_min': group[col].min()
+                    })
+            
+            summaries.append(summary)
+            
+        return pd.DataFrame(summaries)
 
+    def list_available_activities(self) -> pd.DataFrame:
+        """
+        List all available activities and their instance counts.
+        
+        Returns:
+            DataFrame containing activity information
+        """
+        activities = []
+        for activity in self.df['label'].unique():
+            segments = self.get_activity_segments(activity)
+            if segments:  # Only include activities with valid segments
+                durations = [seg['relative_time'].max() for seg in segments]
+                activities.append({
+                    'activity': activity,
+                    'instances': len(segments),
+                    'total_samples': len(self.df[self.df['label'] == activity]),
+                    'avg_duration': np.mean(durations),
+                    'min_duration': np.min(durations),
+                    'max_duration': np.max(durations)
+                })
+        
+        return pd.DataFrame(activities).set_index('activity')
 
-def load_labels(filepath):
-    """
-    Loads and reads CSV MM-Fit CSV label file.
-    :param filepath: File path to a MM-Fit CSV label file.
-    :return: List of lists containing label data, (Start Frame, End Frame, Repetition Count, Activity) for each
-    exercise set.
-    """
-    labels = []
-    with open(filepath, 'r') as csv_file:
-        reader = csv.reader(csv_file)
-        for line in reader:
-            labels.append([int(line[0]), int(line[1]), int(line[2]), line[3]])
-    return labels
-
-
-def get_subset(data, start=0, end=None):
-    """
-    Returns a subset of modality data.
-    :param data: Modality (numpy array).
-    :param start: Start frame of subset.
-    :param end: End frame of subset.
-    :return: Subset of data (numpy array).
-    """
-    if data is None:
-        return None
-
-    # Pose data
-    if len(data.shape) == 3:
-        if end is None:
-            end = data[0, -1, 0]
-        return data[:, np.where(((data[0, :, 0]) >= start) & ((data[0, :, 0]) <= end))[0], :]
-
-    # Accelerometer, gyroscope, magnetometer and heart-rate data
-    else:
-        if end is None:
-            end = data[-1, 0]
-        return data[np.where((data[:, 0] >= start) & (data[:, 0] <= end)), :][0]
-
-
-def parse_args():
-    """
-    Parse command-line arguments to train and evaluate a multimodal network for activity recognition on MM-Fit.
-    :return: Populated namespace.
-    """
-    parser = argparse.ArgumentParser(description='MM-Fit Demo')
-    parser.add_argument('--data', type=str, default='mm-fit/',
-                        help='location of the dataset')
-    parser.add_argument('--unseen_test_set', default=False, action='store_true',
-                        help='if set to true the unseen test set is used for evaluation')
-    parser.add_argument('--epochs', type=int, default=25,
-                        help='number of training epochs')
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help='learning rate')
-    parser.add_argument('--batch_size', type=int, default=128,
-                        help='batch size')
-    parser.add_argument('--eval_every', type=int, default=1,
-                        help='how often to eval model (in epochs)')
-    parser.add_argument('--early_stop', type=int, default=20,
-                        help='stop after this number of epoch if the validation loss did not improve')
-    parser.add_argument('--checkpoint', type=int, default=10,
-                        help='how often to checkpoint model parameters (epochs)')
-    parser.add_argument('--multimodal_ae_wp', type=str, default='',
-                        help='file path for the weights of the multimodal autoencoder part of the model')
-    parser.add_argument('--model_wp', type=str, default='',
-                        help='file path for weights of the full model')
-    parser.add_argument('--window_length', type=int, default=5,
-                        help='length of data window in seconds')
-    parser.add_argument('--window_stride', type=float, default=0.2,
-                        help='length of window stride in seconds')
-    parser.add_argument('--target_sensor_sampling_rate', type=float, default=50,
-                        help='Sampling rate of sensor input signal (Hz)')
-    parser.add_argument('--skeleton_sampling_rate', type=float, default=30,
-                        help='sampling rate of input skeleton data (Hz)')
-    parser.add_argument('--layers', type=int, default=3,
-                        help='number of FC layers')
-    parser.add_argument('--hidden_units', type=int, default=200,
-                        help='number of hidden units')
-    parser.add_argument('--ae_layers', type=int, default=3,
-                        help='number of autoencoder FC layers')
-    parser.add_argument('--ae_hidden_units', type=int, default=200,
-                        help='number of autoencoder hidden units')
-    parser.add_argument('--embedding_units', type=int, default=100,
-                        help='number of hidden units')
-    parser.add_argument('--dropout', type=float, default=0.0,
-                        help='dropout percentage')
-    parser.add_argument('--ae_dropout', type=float, default=0.0,
-                        help='multimodal autoencoder dropout percentage')
-    parser.add_argument('--num_classes', type=int, default=None,
-                        help='number of output classes')
-    parser.add_argument('--name', type=str, default='mmfit_demo_' + str(int(time.time())),
-                        help='name of experiment')
-    parser.add_argument('--output', type=str, default='output/',
-                        help='path to output folder')
-    return parser.parse_args()
