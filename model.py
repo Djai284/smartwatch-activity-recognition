@@ -18,7 +18,7 @@ class IMUCNN(nn.Module):
         self.conv2 = nn.Conv1d(
             in_channels=64,
             out_channels=128,
-            kernel_size=5,
+            kernel_size=9,
             stride=1,
             padding=0
         )
@@ -37,15 +37,16 @@ class IMUCNN(nn.Module):
         out1_pool = out1 // 2  # after maxpool1d(kernel_size=2)
 
         # conv2
-        out2 = conv_out_size(out1_pool, 5, 1, 0)
+        out2 = conv_out_size(out1_pool, 9, 1, 0)
         out2_pool = out2 // 2
 
         # The final feature dimension = out_channels(=128) * out2_pool
         self.fc_input_dim = 128 * out2_pool
 
         # Fully connected layers
-        self.fc1 = nn.Linear(self.fc_input_dim, 64)
-        self.fc2 = nn.Linear(64, num_classes)
+        self.fc1 = nn.Linear(self.fc_input_dim, 500)
+        self.fc2 = nn.Linear(500, 64)
+        self.fc3 = nn.Linear(64, num_classes)
 
     def forward(self, x):
         """
@@ -62,9 +63,12 @@ class IMUCNN(nn.Module):
         # 3) Flatten the feature maps
         x = x.view(-1, self.fc_input_dim)  # flatten to [batch_size, fc_input_dim]
 
+
         # 4) Dense layers
         x = F.relu(self.fc1(x))
-        x = self.fc2(x)  # final logits
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)  # final logits
+
 
         return x
 
