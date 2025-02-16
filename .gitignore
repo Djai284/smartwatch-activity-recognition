@@ -1,3 +1,6 @@
 exercise_data.50.0000_singleonly.mat
 /np_exercise_data-20250216T193815Z-001.zip
 /mm-fit.zip
+/mm-fit/
+/np_exercise_data/
+*.pkl
