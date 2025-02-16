@@ -1,6 +1,195 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# training.py
+import os
+import time
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import accuracy_score
+
+def train_model_with_tensorboard(model, train_loader, val_loader, device, 
+                               num_epochs=50, 
+                               learning_rate=0.001, 
+                               weight_decay=1e-5,
+                               log_dir='runs/exercise_cnn',
+                               save_dir='models',
+                               early_stopping_patience=7,
+                               augmenter=None):
+    """
+    Train the model with TensorBoard logging
+    
+    Args:
+        model: The neural network model
+        train_loader: DataLoader for training data
+        val_loader: DataLoader for validation data
+        device: Device to run the model on (cuda/cpu)
+        num_epochs: Number of training epochs
+        learning_rate: Initial learning rate
+        weight_decay: L2 regularization strength
+        log_dir: Directory for TensorBoard logs
+        save_dir: Directory to save model checkpoints
+        early_stopping_patience: Number of epochs to wait before early stopping
+        augmenter: Optional data augmentation object
+    
+    Returns:
+        Trained model and training history
+    """
+    # Initialize TensorBoard writer
+    writer = SummaryWriter(log_dir)
+    
+    # Create save directory if it doesn't exist
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Define loss function and optimizer
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    
+    # Learning rate scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=3, verbose=True
+    )
+    
+    # Initialize variables for tracking metrics
+    best_val_loss = float('inf')
+    best_val_acc = 0.0
+    epochs_without_improvement = 0
+    history = {
+        'train_loss': [], 'train_acc': [],
+        'val_loss': [], 'val_acc': []
+    }
+    
+    # Get a batch of training data for TensorBoard graph visualization
+    dataiter = iter(train_loader)
+    example_inputs, _ = next(dataiter)
+    example_inputs = example_inputs.to(device)
+    writer.add_graph(model, example_inputs)
+    
+    # Training loop
+    start_time = time.time()
+    for epoch in range(num_epochs):
+        print(f'Epoch {epoch+1}/{num_epochs}')
+        
+        # Training phase
+        model.train()
+        train_losses = []
+        train_preds = []
+        train_true = []
+        
+        for X_batch, y_batch in train_loader:
+            # Apply data augmentation if provided
+            if augmenter is not None:
+                X_batch = augmenter.apply(X_batch)
+            
+            # Move to device
+            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+            
+            # Zero the gradients
+            optimizer.zero_grad()
+            
+            # Forward pass
+            outputs = model(X_batch)
+            loss = criterion(outputs, y_batch)
+            
+            # Backward pass and optimize
+            loss.backward()
+            optimizer.step()
+            
+            # Track metrics
+            train_losses.append(loss.item())
+            _, predicted = torch.max(outputs, 1)
+            train_preds.extend(predicted.cpu().numpy())
+            train_true.extend(y_batch.cpu().numpy())
+        
+        # Calculate training metrics
+        train_loss = np.mean(train_losses)
+        train_acc = accuracy_score(train_true, train_preds)
+        
+        # Validation phase
+        model.eval()
+        val_losses = []
+        val_preds = []
+        val_true = []
+        
+        with torch.no_grad():
+            for X_batch, y_batch in val_loader:
+                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                
+                outputs = model(X_batch)
+                loss = criterion(outputs, y_batch)
+                
+                val_losses.append(loss.item())
+                _, predicted = torch.max(outputs, 1)
+                val_preds.extend(predicted.cpu().numpy())
+                val_true.extend(y_batch.cpu().numpy())
+        
+        # Calculate validation metrics
+        val_loss = np.mean(val_losses)
+        val_acc = accuracy_score(val_true, val_preds)
+        
+        # Update learning rate
+        scheduler.step(val_loss)
+        
+        # Log metrics to TensorBoard
+        writer.add_scalar('Loss/train', train_loss, epoch)
+        writer.add_scalar('Loss/validation', val_loss, epoch)
+        writer.add_scalar('Accuracy/train', train_acc, epoch)
+        writer.add_scalar('Accuracy/validation', val_acc, epoch)
+        writer.add_scalar('Learning_rate', optimizer.param_groups[0]['lr'], epoch)
+        
+        # Add model weights histograms
+        for name, param in model.named_parameters():
+            writer.add_histogram(name, param, epoch)
+        
+        # Update history
+        history['train_loss'].append(train_loss)
+        history['train_acc'].append(train_acc)
+        history['val_loss'].append(val_loss)
+        history['val_acc'].append(val_acc)
+        
+        # Print metrics
+        print(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
+        print(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}')
+        
+        # Check if this is the best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            epochs_without_improvement = 0
+            # Save the best model
+            torch.save(model.state_dict(), os.path.join(save_dir, 'best_model.pt'))
+            print(f'New best model saved with val_loss: {val_loss:.4f}')
+        else:
+            epochs_without_improvement += 1
+        
+        # Save the model if it has the best accuracy
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            torch.save(model.state_dict(), os.path.join(save_dir, 'best_acc_model.pt'))
+            print(f'New best accuracy model saved with val_acc: {val_acc:.4f}')
+        
+        # Early stopping
+        if epochs_without_improvement >= early_stopping_patience:
+            print(f'Early stopping triggered after {epoch+1} epochs')
+            break
+        
+        print('-' * 60)
+    
+    # Calculate and log final training time
+    training_time = time.time() - start_time
+    print(f'Total training time: {training_time:.2f} seconds')
+    writer.add_text('Training_Summary', f'Training completed in {training_time:.2f} seconds')
+    
+    # Close TensorBoard writer
+    writer.close()
+    
+    # Load the best model
+    model.load_state_dict(torch.load(os.path.join(save_dir, 'best_model.pt')))
+    
+    return model, history
+
 
 class IMUCNN(nn.Module):
     def __init__(self, num_classes=5, window_length=100):
