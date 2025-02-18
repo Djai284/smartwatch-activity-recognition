@@ -14,6 +14,9 @@ import warnings
 from typing import Dict, Tuple, Any, Optional, List
 import logging
 from scipy import signal
+from torch.utils.data import Dataset
+from sklearn.preprocessing import LabelEncoder
+
 
 
 
@@ -362,3 +365,181 @@ def parse_args():
     parser.add_argument('--output', type=str, default='output/',
                         help='path to output folder')
     return parser.parse_args()
+
+
+
+
+import psutil
+import os
+import GPUtil
+import logging
+import torch
+from datetime import datetime
+from pathlib import Path
+
+class MemoryMonitor:
+    """Monitor system and GPU memory usage"""
+    @staticmethod
+    def get_size(bytes):
+        """Convert bytes to human readable format"""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if bytes < 1024:
+                return f"{bytes:.2f} {unit}"
+            bytes /= 1024
+            
+    def get_system_memory():
+        """Get system memory usage"""
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        
+        return {
+            'rss': MemoryMonitor.get_size(memory_info.rss),  # Resident Set Size
+            'vms': MemoryMonitor.get_size(memory_info.vms),  # Virtual Memory Size
+            'percent': process.memory_percent(),
+            'system_total': MemoryMonitor.get_size(psutil.virtual_memory().total),
+            'system_available': MemoryMonitor.get_size(psutil.virtual_memory().available)
+        }
+    
+    @staticmethod
+    def get_gpu_memory():
+        """Get GPU memory usage if available"""
+        if torch.cuda.is_available():
+            return {
+                'allocated': MemoryMonitor.get_size(torch.cuda.memory_allocated()),
+                'cached': MemoryMonitor.get_size(torch.cuda.memory_reserved()),
+                'max': MemoryMonitor.get_size(torch.cuda.max_memory_allocated())
+            }
+        return None
+
+def setup_logging(config):
+    """Setup logging configuration"""
+    # Create timestamp for this training run
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = config.log_dir / f'training_{timestamp}.log'
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()
+        ]
+    )
+    
+    return logging.getLogger('training')
+
+def log_memory_usage(logger):
+    """Log current memory usage"""
+    system_memory = MemoryMonitor.get_system_memory()
+    gpu_memory = MemoryMonitor.get_gpu_memory()
+    
+    logger.info("Memory Usage:")
+    logger.info(f"System - RSS: {system_memory['rss']}, "
+                f"Available: {system_memory['system_available']}, "
+                f"Total: {system_memory['system_total']}")
+    
+    if gpu_memory:
+        logger.info(f"GPU - Allocated: {gpu_memory['allocated']}, "
+                   f"Cached: {gpu_memory['cached']}, "
+                   f"Max: {gpu_memory['max']}")
+
+def log_batch_metrics(logger, epoch, batch_idx, total_batches, loss, acc):
+    """Log batch-level metrics"""
+    logger.info(
+        f"Epoch: {epoch}/{total_batches} "
+        f"[{batch_idx}/{total_batches}] "
+        f"Loss: {loss:.4f}, Acc: {acc:.2f}%"
+    )
+    
+def log_epoch_metrics(logger, epoch, train_loss, train_acc, val_loss, val_acc):
+    """Log epoch-level metrics"""
+    logger.info(
+        f"Epoch {epoch} completed:\n"
+        f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%\n"
+        f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%"
+    )
+
+def log_model_summary(logger, model):
+    """Log model architecture and parameter count"""
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    logger.info("\nModel Summary:")
+    logger.info(f"Architecture:\n{model}")
+    logger.info(f"Total parameters: {total_params:,}")
+    logger.info(f"Trainable parameters: {trainable_params:,}")
+
+def log_epoch_summary(logger, epoch, epochs, train_loss, train_acc, val_loss, val_acc):
+    """Log concise epoch summary"""
+    logger.info(
+        f"Epoch [{epoch}/{epochs}] "
+        f"Train Loss: {train_loss:.4f}, Acc: {train_acc:.2f}% | "
+        f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.2f}%"
+    )
+
+    
+import torch
+from torch.utils.data import Dataset
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+
+def custom_collate(batch):
+    """Custom collate function to handle batching"""
+    # Separate inputs and targets
+    inputs = [item[0] for item in batch]
+    targets = [item[1] for item in batch]
+    
+    # Stack inputs and targets
+    inputs = torch.stack(inputs)
+    targets = torch.stack(targets)
+    
+    return inputs, targets
+
+
+def validate_data_shapes(data_df, logger):
+    """Validate shapes of data and log statistics"""
+    shapes = []
+    invalid_indices = []
+    
+    for idx, row in data_df.iterrows():
+        sample = row['sig_array']
+        sample = np.asarray(sample)
+        
+        if len(sample.shape) == 1:
+            sample = sample.reshape(1, -1)
+            
+        shapes.append(sample.shape)
+        
+        # Check for invalid shapes
+        if sample.shape[0] != 6 and sample.shape[1] != 6:
+            invalid_indices.append(idx)
+    
+    # Log shape statistics
+    logger.info("Data Shape Statistics:")
+    logger.info(f"Total samples: {len(shapes)}")
+    logger.info(f"Unique shapes: {set(shapes)}")
+    
+    if invalid_indices:
+        logger.warning(f"Found {len(invalid_indices)} samples with invalid shapes")
+        logger.warning(f"Invalid indices: {invalid_indices}")
+    
+    # Log dimension statistics
+    time_lengths = [shape[1] if shape[0] == 6 else shape[0] for shape in shapes]
+    logger.info(f"Time dimension statistics:")
+    logger.info(f"Min length: {min(time_lengths)}")
+    logger.info(f"Max length: {max(time_lengths)}")
+    logger.info(f"Mean length: {np.mean(time_lengths):.2f}")
+    
+    return invalid_indices
+
+def check_batch_shapes(loader, logger):
+    """Check shapes of batches from dataloader"""
+    logger.info("Checking batch shapes...")
+    sample_batch = next(iter(loader))
+    inputs, targets = sample_batch
+    
+    logger.info(f"Batch input shape: {inputs.shape}")
+    logger.info(f"Batch target shape: {targets.shape}")
+    
+    return inputs.shape, targets.shape

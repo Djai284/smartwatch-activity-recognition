@@ -1,0 +1,34 @@
+{
+    "cv_results": [
+        {
+            "fold": 0,
+            "best_val_loss": 0.0403,
+            "final_val_acc": 98.84
+        },
+        {
+            "fold": 1,
+            "best_val_loss": 0.0426,
+            "final_val_acc": 98.69
+        },
+        {
+            "fold": 2,
+            "best_val_loss": 4.8652,
+            "final_val_acc": 38.04
+        },
+        {
+            "fold": 3,
+            "best_val_loss": 4.7516,
+            "final_val_acc": 36.4
+        },
+        {
+            "fold": 4,
+            "best_val_loss": 0.0405,
+            "final_val_acc": 98.8
+        }
+    ],
+    "num_classes": 67,
+    "window_length": 500,
+    "best_fold": 0,
+    "best_val_loss": 0.0403,
+    "best_val_acc": 98.84
+}

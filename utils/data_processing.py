@@ -67,3 +67,88 @@ class ExerciseDataset(Dataset):
         if self.augmenter:
             x = self.augmenter.apply(x.unsqueeze(0)).squeeze(0)
         return x, self.y[idx]
+    
+
+class MemoryEfficientDataset(Dataset):
+    """Memory efficient dataset with consistent shape handling"""
+    def __init__(self, data_df, indices, preprocessor=None, augmenter=None, target_length=500):
+        self.data_df = data_df.iloc[indices]
+        self.preprocessor = preprocessor
+        self.augmenter = augmenter
+        self.target_length = target_length
+        self.num_channels = 6  # Fixed number of channels (3 acc + 3 gyro)
+        
+        # Store sampling rates mapping
+        self.sampling_rates = self.data_df['dataset'].map({
+            'mmfit': 100,
+            'har_data': 100,
+            'reco': 50
+        }).values
+        
+        # Encode labels once
+        self.label_encoder = LabelEncoder()
+        self.labels = self.label_encoder.fit_transform(self.data_df['activity_name'].values)
+    
+    def process_sequence(self, sequence):
+        """Process sequence to ensure consistent shape"""
+        # Convert to numpy array if not already
+        sequence = np.asarray(sequence)
+        
+        # Ensure 2D array with shape [num_channels, time_steps]
+        if len(sequence.shape) == 1:
+            sequence = sequence.reshape(1, -1)
+        
+        # Ensure correct number of channels
+        if sequence.shape[0] != self.num_channels:
+            if sequence.shape[1] == self.num_channels:
+                sequence = sequence.T
+            else:
+                raise ValueError(f"Invalid number of channels: {sequence.shape}")
+        
+        current_length = sequence.shape[1]
+        
+        if current_length > self.target_length:
+            # Truncate from the center
+            start_idx = (current_length - self.target_length) // 2
+            return sequence[:, start_idx:start_idx + self.target_length]
+        elif current_length < self.target_length:
+            # Pad with zeros on both ends
+            padding_left = (self.target_length - current_length) // 2
+            padding_right = self.target_length - current_length - padding_left
+            return np.pad(sequence, 
+                        ((0, 0), (padding_left, padding_right)),
+                        mode='constant', 
+                        constant_values=0)
+        else:
+            return sequence
+    
+    def __len__(self):
+        return len(self.data_df)
+    
+    def __getitem__(self, idx):
+        # Load single sample
+        sample = self.data_df.iloc[idx]['sig_array']
+        label = self.labels[idx]
+        
+        # Preprocess if needed
+        if self.preprocessor:
+            sample = self.preprocessor.process_sample(
+                sample, 
+                self.sampling_rates[idx]
+            )
+        
+        # Process sequence to ensure consistent shape
+        sample = self.process_sequence(sample)
+        
+        # Convert to tensor with correct shape [num_channels, time_steps]
+        x = torch.tensor(sample, dtype=torch.float32)
+        
+        # Apply augmentation if needed
+        if self.augmenter:
+            x = self.augmenter.apply(x.unsqueeze(0)).squeeze(0)
+            
+        # Ensure label is a tensor
+        y = torch.tensor(label, dtype=torch.long)
+        
+        return x, y
+

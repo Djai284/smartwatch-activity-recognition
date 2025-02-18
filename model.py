@@ -191,6 +191,101 @@ def train_model_with_tensorboard(model, train_loader, val_loader, device,
     return model, history
 
 
+# class IMUCNN(nn.Module):
+#     def __init__(self, num_classes=5, window_length=100):
+#         super().__init__()
+#         # Convolution layers
+#         self.conv1 = nn.Conv1d(
+#             in_channels=6,   # we have 6 input channels: (accX, accY, accZ, gyrX, gyrY, gyrZ)
+#             out_channels=64, # number of filters
+#             kernel_size=9,   # how many time-steps the kernel covers
+#             stride=1,
+#             padding=4        # Changed to 'same' padding (kernel_size//2)
+#         )
+#         self.bn1 = nn.BatchNorm1d(64)  # Add batch normalization
+#         self.pool1 = nn.MaxPool1d(kernel_size=2)
+
+#         self.conv2 = nn.Conv1d(
+#             in_channels=64,
+#             out_channels=128,
+#             kernel_size=9,
+#             stride=1,
+#             padding=4        # Same padding
+#         )
+#         self.bn2 = nn.BatchNorm1d(128)  # Add batch normalization
+#         self.pool2 = nn.MaxPool1d(kernel_size=2)
+
+#         self.conv3 = nn.Conv1d(
+#             in_channels=128,
+#             out_channels=128,
+#             kernel_size=9,
+#             stride=1,
+#             padding=4        # Same padding
+#         )
+#         self.bn3 = nn.BatchNorm1d(128)  # Add batch normalization
+#         self.pool3 = nn.MaxPool1d(kernel_size=2)
+
+#         # Calculate output size after convolutions and pooling
+#         # With 'same' padding, only pooling reduces the size
+#         out_size = window_length
+#         out_size = out_size // 2  # after pool1
+#         out_size = out_size // 2  # after pool2
+#         out_size = out_size // 2  # after pool3
+        
+#         # The final feature dimension
+#         self.fc_input_dim = 128 * out_size
+
+#         # Fully connected layers
+#         self.fc1 = nn.Linear(self.fc_input_dim, 500)
+#         self.bn_fc1 = nn.BatchNorm1d(500)  # Add batch normalization
+#         self.dropout1 = nn.Dropout(p=0.5)  # Increased dropout
+        
+#         self.fc2 = nn.Linear(500, 64)
+#         self.bn_fc2 = nn.BatchNorm1d(64)   # Add batch normalization
+#         self.dropout2 = nn.Dropout(p=0.5)  # Fix typo and increase dropout
+        
+#         self.fc3 = nn.Linear(64, num_classes)
+
+#     def forward(self, x):
+#         """
+#         x shape: [batch_size, 6, window_length]
+#         """
+#         # 1) First convolution + BatchNorm + ReLU + max pool
+#         x = self.conv1(x)
+#         x = self.bn1(x)
+#         x = F.relu(x)
+#         x = self.pool1(x)
+
+#         # 2) Second convolution + BatchNorm + ReLU + max pool
+#         x = self.conv2(x)
+#         x = self.bn2(x)
+#         x = F.relu(x)
+#         x = self.pool2(x)
+
+#         # 3) Third convolution + BatchNorm + ReLU + max pool
+#         x = self.conv3(x)
+#         x = self.bn3(x)
+#         x = F.relu(x)
+#         x = self.pool3(x)
+
+#         # 4) Flatten the feature maps
+#         x = x.view(-1, self.fc_input_dim)
+
+#         # 5) Dense layers with BatchNorm
+#         x = self.fc1(x)
+#         x = self.bn_fc1(x)
+#         x = F.relu(x)
+#         x = self.dropout1(x)
+        
+#         x = self.fc2(x)
+#         x = self.bn_fc2(x)
+#         x = F.relu(x)
+#         x = self.dropout2(x)
+        
+#         x = self.fc3(x)  # final logits
+
+#         return x
+
 class IMUCNN(nn.Module):
     def __init__(self, num_classes=5, window_length=100):
         super().__init__()
@@ -246,6 +341,32 @@ class IMUCNN(nn.Module):
         
         self.fc3 = nn.Linear(64, num_classes)
 
+        # Add ReLU modules for quantization
+        self.relu1 = nn.ReLU(inplace=False)
+        self.relu2 = nn.ReLU(inplace=False)
+        self.relu3 = nn.ReLU(inplace=False)
+
+    def fuse_model(self):
+        """Fuse operations for better quantization"""
+        torch.quantization.fuse_modules(
+            self,
+            [
+                ['conv1', 'bn1', 'relu1'],
+                ['conv2', 'bn2', 'relu2'],
+                ['conv3', 'bn3', 'relu3']
+            ],
+            inplace=True
+        )
+
+    def prepare_for_quantization(self):
+        """Prepare model for quantization"""
+        # Replace ReLU with quantization-friendly version
+        self.relu1 = nn.ReLU(inplace=False)
+        self.relu2 = nn.ReLU(inplace=False)
+        self.relu3 = nn.ReLU(inplace=False)
+        # Fuse layers
+        self.fuse_model()
+
     def forward(self, x):
         """
         x shape: [batch_size, 6, window_length]
@@ -253,19 +374,19 @@ class IMUCNN(nn.Module):
         # 1) First convolution + BatchNorm + ReLU + max pool
         x = self.conv1(x)
         x = self.bn1(x)
-        x = F.relu(x)
+        x = self.relu1(x)  # Use class ReLU instead of F.relu
         x = self.pool1(x)
 
         # 2) Second convolution + BatchNorm + ReLU + max pool
         x = self.conv2(x)
         x = self.bn2(x)
-        x = F.relu(x)
+        x = self.relu2(x)  # Use class ReLU instead of F.relu
         x = self.pool2(x)
 
         # 3) Third convolution + BatchNorm + ReLU + max pool
         x = self.conv3(x)
         x = self.bn3(x)
-        x = F.relu(x)
+        x = self.relu3(x)  # Use class ReLU instead of F.relu
         x = self.pool3(x)
 
         # 4) Flatten the feature maps
@@ -326,6 +447,7 @@ class TimeSeriesAugmentation:
         x = self.time_shift(x)
         x = self.scale(x)
         return x
+
 
 # Example usage:
 if __name__ == "__main__":

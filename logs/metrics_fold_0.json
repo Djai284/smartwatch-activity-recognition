@@ -1,0 +1,421 @@
+{
+    "f1_macro": 0.9283346049211904,
+    "f1_weighted": 0.9873882474403096,
+    "classification_report": {
+        "alternatingdumbbellcurl": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 3.0
+        },
+        "armbandadjustment": {
+            "precision": 0.9555555555555556,
+            "recall": 0.7166666666666667,
+            "f1-score": 0.819047619047619,
+            "support": 60.0
+        },
+        "bandpull-downrow": {
+            "precision": 0.9634146341463414,
+            "recall": 1.0,
+            "f1-score": 0.9813664596273292,
+            "support": 79.0
+        },
+        "bicep_curls": {
+            "precision": 0.975,
+            "recall": 1.0,
+            "f1-score": 0.9873417721518988,
+            "support": 39.0
+        },
+        "bicepcurls": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 227.0
+        },
+        "bicepscurl(band)": {
+            "precision": 1.0,
+            "recall": 0.9883720930232558,
+            "f1-score": 0.9941520467836257,
+            "support": 86.0
+        },
+        "boxjumps": {
+            "precision": 1.0,
+            "recall": 0.9983844911147012,
+            "f1-score": 0.9991915925626516,
+            "support": 619.0
+        },
+        "burpee": {
+            "precision": 0.9967637540453075,
+            "recall": 0.9967637540453075,
+            "f1-score": 0.9967637540453075,
+            "support": 309.0
+        },
+        "burpees": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 677.0
+        },
+        "butterflysit-up": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 342.0
+        },
+        "chestpress(rack)": {
+            "precision": 1.0,
+            "recall": 0.9880952380952381,
+            "f1-score": 0.9940119760479041,
+            "support": 84.0
+        },
+        "crunch": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 232.0
+        },
+        "crunches": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 587.0
+        },
+        "deadlifts": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 594.0
+        },
+        "deviceontable": {
+            "precision": 0.9997749268512266,
+            "recall": 0.9979779824758481,
+            "f1-score": 0.9988756465032607,
+            "support": 4451.0
+        },
+        "dip": {
+            "precision": 1.0,
+            "recall": 0.9761904761904762,
+            "f1-score": 0.9879518072289156,
+            "support": 168.0
+        },
+        "dumbbell_rows": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 34.0
+        },
+        "dumbbell_shoulder_press": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 75.0
+        },
+        "dumbbellrows": {
+            "precision": 0.9856459330143541,
+            "recall": 0.9903846153846154,
+            "f1-score": 0.988009592326139,
+            "support": 624.0
+        },
+        "dumbbellshoulderpress": {
+            "precision": 0.9976525821596244,
+            "recall": 1.0,
+            "f1-score": 0.9988249118683902,
+            "support": 425.0
+        },
+        "dynamicstretch(atyourownpace)": {
+            "precision": 0.9612817089452603,
+            "recall": 0.9625668449197861,
+            "f1-score": 0.9619238476953907,
+            "support": 748.0
+        },
+        "ellipticalmachine": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 543.0
+        },
+        "fastalternatingpunches": {
+            "precision": 1.0,
+            "recall": 0.9940119760479041,
+            "f1-score": 0.996996996996997,
+            "support": 167.0
+        },
+        "jumping_jacks": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 2.0
+        },
+        "jumpingjacks": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 76.0
+        },
+        "jumprope": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 256.0
+        },
+        "kbpress": {
+            "precision": 1.0,
+            "recall": 0.9974424552429667,
+            "f1-score": 0.998719590268886,
+            "support": 391.0
+        },
+        "kbsquatpress": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 431.0
+        },
+        "kettlebellswing": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 183.0
+        },
+        "lateral_shoulder_raises": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 85.0
+        },
+        "lateralshoulderraises": {
+            "precision": 0.9851851851851852,
+            "recall": 1.0,
+            "f1-score": 0.9925373134328358,
+            "support": 133.0
+        },
+        "lawnmower(leftarm)": {
+            "precision": 0.9885057471264368,
+            "recall": 1.0,
+            "f1-score": 0.9942196531791907,
+            "support": 86.0
+        },
+        "lawnmower(rightarm)": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 82.0
+        },
+        "lunges": {
+            "precision": 0.9961538461538462,
+            "recall": 0.9987146529562982,
+            "f1-score": 0.9974326059050064,
+            "support": 778.0
+        },
+        "medicineballslam": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 98.0
+        },
+        "non-e": {
+            "precision": 0.996771353096566,
+            "recall": 0.9994114184814596,
+            "f1-score": 0.9980896399706098,
+            "support": 3398.0
+        },
+        "nonexercise": {
+            "precision": 0.834319526627219,
+            "recall": 0.9215686274509803,
+            "f1-score": 0.8757763975155279,
+            "support": 306.0
+        },
+        "note": {
+            "precision": 1.0,
+            "recall": 0.8695652173913043,
+            "f1-score": 0.9302325581395349,
+            "support": 23.0
+        },
+        "null": {
+            "precision": 0.9924812030075187,
+            "recall": 0.9814126394052045,
+            "f1-score": 0.9869158878504672,
+            "support": 269.0
+        },
+        "overheadtricepsextension(labelspansbotharms)": {
+            "precision": 0.8666666666666667,
+            "recall": 0.8666666666666667,
+            "f1-score": 0.8666666666666667,
+            "support": 15.0
+        },
+        "plank": {
+            "precision": 0.9913544668587896,
+            "recall": 0.9828571428571429,
+            "f1-score": 0.9870875179340028,
+            "support": 350.0
+        },
+        "powerboatpose": {
+            "precision": 0.9806451612903225,
+            "recall": 0.9934640522875817,
+            "f1-score": 0.987012987012987,
+            "support": 153.0
+        },
+        "pullups": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 269.0
+        },
+        "pushups": {
+            "precision": 0.9986111111111111,
+            "recall": 1.0,
+            "f1-score": 0.9993050729673384,
+            "support": 719.0
+        },
+        "repetitivestretching": {
+            "precision": 0.9152542372881356,
+            "recall": 0.8503937007874016,
+            "f1-score": 0.8816326530612245,
+            "support": 127.0
+        },
+        "rest": {
+            "precision": 0.9477806788511749,
+            "recall": 0.9577836411609498,
+            "f1-score": 0.952755905511811,
+            "support": 379.0
+        },
+        "rowingmachine": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 613.0
+        },
+        "running(treadmill)": {
+            "precision": 1.0,
+            "recall": 0.9959432048681541,
+            "f1-score": 0.9979674796747967,
+            "support": 493.0
+        },
+        "russiantwist": {
+            "precision": 0.9914529914529915,
+            "recall": 0.9747899159663865,
+            "f1-score": 0.9830508474576272,
+            "support": 238.0
+        },
+        "seatedbackfly": {
+            "precision": 0.9939024390243902,
+            "recall": 1.0,
+            "f1-score": 0.9969418960244648,
+            "support": 163.0
+        },
+        "sideplankleftside": {
+            "precision": 0.9925925925925926,
+            "recall": 0.9571428571428572,
+            "f1-score": 0.9745454545454545,
+            "support": 140.0
+        },
+        "sideplankrightside": {
+            "precision": 0.9919354838709677,
+            "recall": 1.0,
+            "f1-score": 0.9959514170040485,
+            "support": 123.0
+        },
+        "sit-up(handspositionedbehindhead)": {
+            "precision": 0.992,
+            "recall": 1.0,
+            "f1-score": 0.9959839357429718,
+            "support": 248.0
+        },
+        "situps": {
+            "precision": 1.0,
+            "recall": 0.9824120603015075,
+            "f1-score": 0.991128010139417,
+            "support": 398.0
+        },
+        "squats": {
+            "precision": 0.9951560818083961,
+            "recall": 0.9940860215053764,
+            "f1-score": 0.9946207638515331,
+            "support": 1860.0
+        },
+        "staticstretch": {
+            "precision": 0.9582491582491582,
+            "recall": 0.9474034620505992,
+            "f1-score": 0.9527954469367258,
+            "support": 1502.0
+        },
+        "staticstretch(atyourownpace)": {
+            "precision": 0.8948811700182815,
+            "recall": 0.965483234714004,
+            "f1-score": 0.928842504743833,
+            "support": 1014.0
+        },
+        "tapleftdevice": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 9.0
+        },
+        "taprightdevice": {
+            "precision": 0.8181818181818182,
+            "recall": 0.3103448275862069,
+            "f1-score": 0.45,
+            "support": 58.0
+        },
+        "tricep_extensions": {
+            "precision": 0.9807692307692307,
+            "recall": 1.0,
+            "f1-score": 0.9902912621359223,
+            "support": 51.0
+        },
+        "tricepextensions": {
+            "precision": 0.9928469241773963,
+            "recall": 0.9830028328611898,
+            "f1-score": 0.9879003558718861,
+            "support": 706.0
+        },
+        "two-armdumbbellcurl(botharms,notalternating)": {
+            "precision": 0.9960159362549801,
+            "recall": 0.9960159362549801,
+            "f1-score": 0.9960159362549801,
+            "support": 251.0
+        },
+        "unlistedexercise": {
+            "precision": 1.0,
+            "recall": 0.6923076923076923,
+            "f1-score": 0.8181818181818182,
+            "support": 13.0
+        },
+        "v-up": {
+            "precision": 0.9957627118644068,
+            "recall": 1.0,
+            "f1-score": 0.9978768577494692,
+            "support": 235.0
+        },
+        "walk": {
+            "precision": 0.9989287627209427,
+            "recall": 0.9994640943193998,
+            "f1-score": 0.999196356817573,
+            "support": 1866.0
+        },
+        "wallball": {
+            "precision": 1.0,
+            "recall": 0.9886363636363636,
+            "f1-score": 0.9942857142857143,
+            "support": 88.0
+        },
+        "wallballs": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 507.0
+        },
+        "accuracy": 0.9878779893273602,
+        "macro avg": {
+            "precision": 0.9391267698353164,
+            "recall": 0.9226227888980071,
+            "f1-score": 0.9283346049211904,
+            "support": 30358.0
+        },
+        "weighted avg": {
+            "precision": 0.9875962132350157,
+            "recall": 0.9878779893273602,
+            "f1-score": 0.9873882474403096,
+            "support": 30358.0
+        }
+    }
+}
