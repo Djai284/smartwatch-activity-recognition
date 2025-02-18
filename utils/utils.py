@@ -83,61 +83,134 @@ def load_crossfit(datapath = None, info_path=None):
     return df
 
 
-def create_examples(df, dim=500, between = None):
+import pandas as pd
+import numpy as np
+from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm  # For progress tracking
+
+def create_examples(df, dim=500, between=None, show_progress=True):
     """
     This creates the data in proper form for a CNN model
     Args:
         df: The data in format one reading per row 
         dim: dimension of the cnn (number of reading in each input)
-        between: time between starts of different sequence (if none they will be completely seperate)
+        between: time between starts of different sequence (if none they will be completely separate)
+        show_progress: Whether to show a progress bar
     """
-    # initialize dataframe
-    ex_df = pd.DataFrame(columns=['id', 'sig_array', 'activity_name', 'subject_id', 'dataset'])
+    # Convert to numpy for faster operations
+    activity_array = df['activity_name'].values
+    subject_array = df['subject_id'].values
+    dataset_array = df['dataset'].values
+    sensor_columns = ['gyr_X', 'gyr_Y', 'gyr_Z', 'acc_X', 'acc_Y', 'acc_Z']
+    sensor_data = df[sensor_columns].values
     
-    # initialize values to first row of dataset
-    label = df.loc[0, 'activity_name']
-    user = df.loc[0, 'subject_id']
-    dataset = df.loc[0, 'dataset']
-
-    # variables for iteration
-    counter = 0
-    i= 0
-    j = i + between
-    arr = []
+    result_ids = []
+    result_sig_arrays = []
+    result_activity_names = []
+    result_subject_ids = []
+    result_datasets = []
     
-    # loop through all data
-    print("creating dataset for model")
-    while i < len(df):
-
-        # set current row
-        row = df.iloc[i,:]
-
-        # chck if activity or user changed and reset all variables if true
-        if row['activity_name'] != label or row['subject_id'] !=  user:
-            label = row['activity_name']
-            user = row['subject_id']
-            dataset = row['dataset']
-            counter = 0
-            arr = []
-            j = i + between
-
-        # add new row to input array 
-        arr.append(row[['gyr_X', 'gyr_Y', 'gyr_Z', 'acc_X', 'acc_Y', 'acc_Z']].values)
-        counter += 1  
-
-        # check if array is correct size
-        if counter >= dim:
-
-            # add new input to dataframe and reset iteration variables
-            ex_df.loc[len(ex_df)] = [len(ex_df), np.array(arr), label, user, dataset]
-            counter = 0
-            arr = []
-            i = j
-            j = i + between
-
-        i += 1
-
+    print("Creating dataset for model...")
+    
+    i = 0
+    total_len = len(df)
+    
+    # Set up progress bar if requested
+    pbar = tqdm(total=total_len) if show_progress else None
+    
+    while i < total_len:
+        # Get initial values
+        label = activity_array[i]
+        user = subject_array[i]
+        dataset = dataset_array[i]
+        
+        # Find the end of this segment (where activity or user changes)
+        segment_end = i
+        while segment_end < total_len and activity_array[segment_end] == label and subject_array[segment_end] == user:
+            segment_end += 1
+        
+        # Process this segment
+        j = i
+        while j + dim <= segment_end:
+            # Extract the chunk of sensor data
+            arr = sensor_data[j:j+dim].copy()
+            
+            # Add to results
+            result_ids.append(len(result_ids))
+            result_sig_arrays.append(arr)
+            result_activity_names.append(label)
+            result_subject_ids.append(user)
+            result_datasets.append(dataset)
+            
+            # Move to next position
+            if between is None:
+                j += dim  # Non-overlapping windows
+            else:
+                j += between  # Overlapping windows with specified step
+        
+        # Update progress bar
+        if pbar is not None:
+            pbar.update(segment_end - i)
+        
+        # Move to the next segment
+        i = segment_end
+    
+    if pbar is not None:
+        pbar.close()
+    
+    # Create dataframe from results
+    ex_df = pd.DataFrame({
+        'id': result_ids,
+        'sig_array': result_sig_arrays,
+        'activity_name': result_activity_names,
+        'subject_id': result_subject_ids,
+        'dataset': result_datasets
+    })
+    
+    print(f"Created {len(ex_df)} examples")
     return ex_df
+
+def process_chunk(args):
+    """Helper function for parallel processing with progress tracking"""
+    chunk_df, dim, between, chunk_id, total_chunks = args
+    result = create_examples(chunk_df, dim, between, show_progress=False)
+    print(f"Processed chunk {chunk_id+1}/{total_chunks} with {len(result)} examples")
+    return result
+
+def create_examples_parallel(df, dim=500, between=None, n_workers=4):
+    """Parallel version of create_examples using multiple processes"""
+    # Split dataframe into chunks by subject and activity
+    chunks = []
+    current_chunk = []
+    
+    for i in range(len(df)):
+        if i == 0:
+            current_chunk = [i]
+        elif (df.iloc[i]['activity_name'] != df.iloc[i-1]['activity_name'] or 
+              df.iloc[i]['subject_id'] != df.iloc[i-1]['subject_id']):
+            chunks.append((current_chunk[0], i))
+            current_chunk = [i]
+    
+    if current_chunk:
+        chunks.append((current_chunk[0], len(df)))
+    
+    # Process chunks in parallel
+    df_chunks = [df.iloc[start:end].copy().reset_index(drop=True) for start, end in chunks]
+    print(f"Split data into {len(df_chunks)} chunks for parallel processing")
+    
+    # Prepare arguments with chunk IDs for progress tracking
+    chunk_args = [(chunk, dim, between, i, len(df_chunks)) 
+                  for i, chunk in enumerate(df_chunks)]
+    
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(process_chunk, chunk_args))
+    
+    # Combine results
+    combined_df = pd.concat(results, ignore_index=True)
+    combined_df['id'] = range(len(combined_df))  # Fix IDs
+    
+    print(f"Final dataset contains {len(combined_df)} examples")
+    return combined_df
 
 
 def create_df(acc_data, gyr_data, label_df, person_id = 0):
