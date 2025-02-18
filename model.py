@@ -196,13 +196,13 @@ class IMUCNN(nn.Module):
         super().__init__()
         # Convolution layers
         self.conv1 = nn.Conv1d(
-            in_channels=6,   # we have 6 input channels: (accX, accY, accZ, gyrX, gyrY, gyrZ)
-            out_channels=64, # number of filters
-            kernel_size=9,   # how many time-steps the kernel covers
+            in_channels=6,   
+            out_channels=64, 
+            kernel_size=9,   
             stride=1,
-            padding=4        # Changed to 'same' padding (kernel_size//2)
+            padding=4        
         )
-        self.bn1 = nn.BatchNorm1d(64)  # Add batch normalization
+        self.bn1 = nn.BatchNorm1d(64)  
         self.pool1 = nn.MaxPool1d(kernel_size=2)
 
         self.conv2 = nn.Conv1d(
@@ -210,9 +210,9 @@ class IMUCNN(nn.Module):
             out_channels=128,
             kernel_size=9,
             stride=1,
-            padding=4        # Same padding
+            padding=4        
         )
-        self.bn2 = nn.BatchNorm1d(128)  # Add batch normalization
+        self.bn2 = nn.BatchNorm1d(128)  
         self.pool2 = nn.MaxPool1d(kernel_size=2)
 
         self.conv3 = nn.Conv1d(
@@ -220,7 +220,7 @@ class IMUCNN(nn.Module):
             out_channels=128,
             kernel_size=9,
             stride=1,
-            padding=4        # Same padding
+            padding=4        
         )
         self.bn3 = nn.BatchNorm1d(128)  # Add batch normalization
         self.pool3 = nn.MaxPool1d(kernel_size=2)
@@ -282,7 +282,7 @@ class IMUCNN(nn.Module):
         x = F.relu(x)
         x = self.dropout2(x)
         
-        x = self.fc3(x)  # final logits
+        x = self.fc3(x)  
 
         return x
 
@@ -322,9 +322,9 @@ class TimeSeriesAugmentation:
         return x * scale
     
     def apply(self, x):
-        x = self.add_noise(x)
+        # x = self.add_noise(x)
         x = self.time_shift(x)
-        x = self.scale(x)
+        # x = self.scale(x)
         return x
 
 # Example usage:
