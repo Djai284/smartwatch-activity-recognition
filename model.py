@@ -541,8 +541,8 @@ def train_model_with_advanced_logging(
         if len(class_names) != n_classes:
             class_names = [str(i) for i in range(n_classes)]
         
-        plt.xticks(np.arange(n_classes) + 0.5, class_names, rotation=45, fontsize=8)
-        plt.yticks(np.arange(n_classes) + 0.5, class_names, rotation=45, fontsize=8)
+        plt.xticks(np.arange(n_classes) , class_names, rotation=45, fontsize=6)
+        plt.yticks(np.arange(n_classes) , class_names, rotation=45, fontsize=6)
         plt.title(f'{phase} Confusion Matrix')
         writer.add_figure(f'Confusion_Matrix/{phase}', fig, epoch)
         plt.close()
@@ -692,7 +692,7 @@ def objective(trial: Trial, train_loader, val_loader, device, input_channels, nu
     params = {
         'conv_layers': trial.suggest_int('conv_layers', 2, 5),
         'kernel_size': trial.suggest_int('kernel_size', 3, 15, step=2),  # Odd numbers only
-        'initial_filters': trial.suggest_int('initial_filters', 16, 256, step=16),
+        'initial_filters': trial.suggest_int('initial_filters', 16, 64, step=16),
         'dropout_rate': trial.suggest_float('dropout_rate', 0.2, 0.8),
         'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True),
         'weight_decay': trial.suggest_float('weight_decay', 1e-6, 1e-3, log=True),
@@ -727,7 +727,7 @@ def objective(trial: Trial, train_loader, val_loader, device, input_channels, nu
         model_name=trial_name,
         learning_rate=params['learning_rate'],
         weight_decay=params['weight_decay'],
-        num_epochs=30,  
+        num_epochs=20,  
         early_stopping_patience=5,
         class_names= class_names
     )
