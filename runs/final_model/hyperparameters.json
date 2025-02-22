@@ -1,0 +1,12 @@
+{
+    "model_name": "final_model",
+    "learning_rate": 0.00028585765064982296,
+    "weight_decay": 2.7469664408313422e-05,
+    "num_epochs": 100,
+    "batch_size": 32,
+    "early_stopping_patience": 7,
+    "model_architecture": "FlexibleCNN(\n  (conv_blocks): ModuleList(\n    (0): Conv1d(6, 64, kernel_size=(7,), stride=(1,), padding=(3,))\n    (1): Conv1d(64, 128, kernel_size=(7,), stride=(1,), padding=(3,))\n    (2): Conv1d(128, 256, kernel_size=(7,), stride=(1,), padding=(3,))\n    (3): Conv1d(256, 512, kernel_size=(7,), stride=(1,), padding=(3,))\n  )\n  (bn_layers): ModuleList(\n    (0): BatchNorm1d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n    (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n    (2): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n    (3): BatchNorm1d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n  )\n  (pool_layers): ModuleList(\n    (0-3): 4 x MaxPool1d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)\n  )\n  (fc_layers): ModuleList(\n    (0): Linear(in_features=9216, out_features=428, bias=True)\n    (1): Linear(in_features=428, out_features=351, bias=True)\n  )\n  (fc_bn_layers): ModuleList(\n    (0): BatchNorm1d(428, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n    (1): BatchNorm1d(351, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n  )\n  (fc_dropouts): ModuleList(\n    (0-1): 2 x Dropout(p=0.612883398809912, inplace=False)\n  )\n  (fc_final): Linear(in_features=351, out_features=34, bias=True)\n)",
+    "optimizer": "Adam",
+    "scheduler": "ReduceLROnPlateau",
+    "augmentation": "None"
+}

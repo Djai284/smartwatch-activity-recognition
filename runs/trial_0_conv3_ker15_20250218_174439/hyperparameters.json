@@ -1,0 +1,12 @@
+{
+    "model_name": "trial_0_conv3_ker15",
+    "learning_rate": 2.9380279387035334e-05,
+    "weight_decay": 2.9375384576328313e-06,
+    "num_epochs": 30,
+    "batch_size": 32,
+    "early_stopping_patience": 5,
+    "model_architecture": "FlexibleCNN(\n  (conv_blocks): ModuleList(\n    (0): Conv1d(6, 192, kernel_size=(15,), stride=(1,), padding=(7,))\n    (1): Conv1d(192, 384, kernel_size=(15,), stride=(1,), padding=(7,))\n    (2): Conv1d(384, 768, kernel_size=(15,), stride=(1,), padding=(7,))\n  )\n  (bn_layers): ModuleList(\n    (0): BatchNorm1d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n    (1): BatchNorm1d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n    (2): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n  )\n  (pool_layers): ModuleList(\n    (0-2): 3 x MaxPool1d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)\n  )\n  (fc_layers): ModuleList(\n    (0): Linear(in_features=28416, out_features=448, bias=True)\n  )\n  (fc_bn_layers): ModuleList(\n    (0): BatchNorm1d(448, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n  )\n  (fc_dropouts): ModuleList(\n    (0): Dropout(p=0.559195090518222, inplace=False)\n  )\n  (fc_final): Linear(in_features=448, out_features=34, bias=True)\n)",
+    "optimizer": "Adam",
+    "scheduler": "ReduceLROnPlateau",
+    "augmentation": "None"
+}
